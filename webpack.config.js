@@ -1,75 +1,96 @@
 const webpack = require('webpack'),
-    path = require('path'),
-    fs = require('fs');
+path = require('path'),
+fs = require('fs');
 
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const ExtractTextPlugin = require("extract-text-webpack-plugin");
+const HTMLInlineSourcePlugin = require('html-webpack-inline-source-plugin');
+
+
 
 const distPath = path.join(__dirname + '/dist');
 const srcPath = path.join(__dirname + '/src');
 
+
+const requiredDirectorys = ['font', 'style', 'js', 'assets'];
+requiredDirectorys.forEach(dirName => {
+const dirPath = path.join(srcPath, dirName);
+!fs.existsSync(dirPath) && fs.mkdirSync(dirPath);
+});
+
+
+
 const htmlFiles = fs.readdirSync(srcPath).filter(fileName => path.extname(fileName) === '.html');
 
 const plugins = [];
-
+const inlineExp = '(js|css)$';
 htmlFiles.forEach(fileName => {
-    plugins.push(new HtmlWebpackPlugin({
-        filename: fileName,
-        template: path.join(srcPath, fileName)
-    }));
+plugins.push(new HtmlWebpackPlugin({
+    inlineSource: inlineExp,
+    filename: fileName,
+    template: path.join(srcPath, fileName)
+}));
 });
 
 const cssFileName = process.env.NODE_ENV === 'production' ? 'style/[name].css' : 'style/[name].[contenthash].css';
-
 const extractSass = new ExtractTextPlugin(cssFileName);
+
+
 plugins.push(extractSass);
 plugins.push(new webpack.DefinePlugin({
-    app: {
-        environment: JSON.stringify(process.env.APP_ENVIRONMENT || 'development')
-    }
+app: {
+    environment: JSON.stringify(process.env.APP_ENVIRONMENT || 'development')
+}
 }));
 
+if (process.env.NODE_ENV === 'production') {
+plugins.push(new HTMLInlineSourcePlugin());
+plugins.push(new webpack.optimize.UglifyJsPlugin({
+    compressor: { warnings: false }
+}));
+}
 const config = {
-    entry: path.join(srcPath, '/index.js'),
-    output: {
-        path: distPath,
-        publicPath: '',
-        filename: 'app.bundle.js'
-    },
-    module: {
-        loaders: [{
-                test: /\.html$/,
-                loader: 'html-loader'
-            },
-            {
-                test: /\.scss$/,
-                use: extractSass.extract(['css-loader', 'resolve-url-loader', 'sass-loader']),
-            },
-            {
-                test: /\.(eot|svg|ttf|woff|woff2|otf)$/,
-                use: [
-                    { loader: 'url-loader', options: { name: 'font/[name].[ext]', limit: 0 } },
-                ]
-            },
-            {
-                test: /\.(gif|png|jpe?g|svg)$/i,
-                loaders: [
-                    'url-loader?limit=10000&name=assets/imgs/[name].[ext]',
-                    // 'file-loader?name=/assets/[name].[ext]',
-                    /*'image-webpack-loader?{optimizationLevel: 7, interlaced: false, pngquant:{quality: "65-90", speed: 4}, mozjpeg: {quality: 65}}'*/
-                ]
-            }
-        ]
-    },
-    resolve: {
-        extensions: ['*', '.js', '.html', '.css', 'scss']
-    },
-    devServer: {
-        contentBase: path.join(__dirname, "src")
-    },
-    plugins: plugins
+entry: path.join(srcPath, '/index.js'),
+output: {
+    path: distPath,
+    publicPath: '',
+    filename: 'app.bundle.js'
+},
+module: {
+    loaders: [{
+            test: /\.html$/,
+            loader: 'html-loader'
+        },
+        {
+            test: /\.scss$/,
+            use: extractSass.extract(['css-loader?minimize=true', 'resolve-url-loader', 'sass-loader']),
+        },
+        {
+            test: /\.(eot|svg|ttf|woff|woff2|otf)$/,
+            loaders: [
+                'url-loader?limit=10000&name=assets/font/[name].[ext]',
+            ]
+        },
+        {
+            test: /\.(gif|png|jpe?g|svg)$/i,
+            use: [{
+                loader: 'url-loader',
+                options: {
+                    limit: 10000,
+                    name: 'assets/imgs/[name].[ext]'
+                }
+            }]
+        }
+    ]
+},
+resolve: {
+    extensions: ['*', '.js', '.html', '.css', 'scss']
+},
+devServer: {
+    contentBase: path.join(__dirname, "src")
+},
+plugins: plugins
 };
-config.devtool = '#cheap-module-source-map';
 console.log('curreunt mode : ', process.env.NODE_ENV + ' mode');
 
 module.exports = config;
