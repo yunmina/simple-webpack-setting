@@ -62,7 +62,7 @@ module: {
             loader: 'html-loader'
         },
         {
-            test: /\.scss$/,
+            test: /\.(scss|css)$/,
             use: extractSass.extract(['css-loader?minimize=true', 'resolve-url-loader', 'sass-loader']),
         },
         {
